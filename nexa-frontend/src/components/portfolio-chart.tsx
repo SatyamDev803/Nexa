@@ -1,77 +1,143 @@
+// src/components/portfolio-chart.tsx
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts"
+import * as React from "react"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart"
 
 const portfolioData = [
-  { date: "Jan 1", value: 10000, pnl: 0 },
-  { date: "Jan 15", value: 10847, pnl: 847 },
-  { date: "Feb 1", value: 11234, pnl: 1234 },
-  { date: "Feb 15", value: 12156, pnl: 2156 },
-  { date: "Mar 1", value: 11892, pnl: 1892 },
-  { date: "Mar 15", value: 13247, pnl: 3247 },
-  { date: "Apr 1", value: 14589, pnl: 4589 },
-  { date: "Apr 15", value: 15234, pnl: 5234 },
-  { date: "May 1", value: 16847, pnl: 6847 },
-  { date: "May 15", value: 17456, pnl: 7456 },
-  { date: "Jun 1", value: 18263, pnl: 8263 },
+  { date: "2024-04-01", value: 15000 }, { date: "2024-04-05", value: 15234 },
+  { date: "2024-04-10", value: 15012 }, { date: "2024-04-15", value: 15567 },
+  { date: "2024-04-20", value: 15321 }, { date: "2024-04-25", value: 15890 },
+  { date: "2024-04-30", value: 16201 }, { date: "2024-05-05", value: 15987 },
+  { date: "2024-05-10", value: 16543 }, { date: "2024-05-15", value: 16899 },
+  { date: "2024-05-20", value: 17234 }, { date: "2024-05-25", value: 16980 },
+  { date: "2024-05-30", value: 17546 }, { date: "2024-06-05", value: 18011 },
+  { date: "2024-06-10", value: 17890 }, { date: "2024-06-15", value: 18321 },
+  { date: "2024-06-20", value: 18888 }, { date: "2024-06-25", value: 19123 },
+  { date: "2024-06-30", value: 19500 },
 ]
+
+const chartConfig = {
+  value: {
+    label: "Value",
+    color: "var(--chart-1)",
+  },
+} satisfies ChartConfig
 
 interface PortfolioChartProps {
   timeframe: "7d" | "30d" | "90d" | "1y"
 }
 
 export function PortfolioChart({ timeframe }: PortfolioChartProps) {
-  const currentValue = portfolioData[portfolioData.length - 1].value
-  const initialValue = portfolioData[0].value
-  const totalGain = currentValue - initialValue
-  const totalGainPercent = ((totalGain / initialValue) * 100).toFixed(2)
+  const filteredData = React.useMemo(() => {
+    const referenceDate = new Date(portfolioData[portfolioData.length - 1].date)
+    let daysToSubtract = 90
+    if (timeframe === "30d") {
+      daysToSubtract = 30
+    } else if (timeframe === "7d") {
+      daysToSubtract = 7
+    } else if (timeframe === "1y") {
+      daysToSubtract = 365
+    }
+    
+    const startDate = new Date(referenceDate)
+    startDate.setDate(startDate.getDate() - daysToSubtract)
+
+    return portfolioData.filter((item) => new Date(item.date) >= startDate)
+  }, [timeframe])
+
+  const totalValue = filteredData.length > 0 ? filteredData[filteredData.length - 1].value : 0
+  const startValue = filteredData.length > 0 ? filteredData[0].value : 0
+  const gain = totalValue - startValue
+  const gainPercent = startValue > 0 ? (gain / startValue) * 100 : 0
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Portfolio Performance</CardTitle>
-        <div className="flex items-center gap-4">
-          <div>
-            <div className="text-2xl font-bold">${currentValue.toLocaleString()}</div>
-            <div className="text-sm text-green-500">
-              +${totalGain.toLocaleString()} ({totalGainPercent}%)
+      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+        <div className="grid flex-1 gap-1">
+          <CardTitle>Portfolio Performance</CardTitle>
+          <CardDescription>
+            Showing performance for the selected time range
+          </CardDescription>
+        </div>
+        <div className="text-right">
+            <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
+            <div className={`text-sm font-medium ${gain >= 0 ? "text-green-500" : "text-red-500"}`}>
+              {gain >= 0 ? "+" : ""}${gain.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({gainPercent.toFixed(2)}%)
             </div>
-          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={portfolioData}>
-              <defs>
-                <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="date" className="text-xs fill-muted-foreground" />
-              <YAxis className="text-xs fill-muted-foreground" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Portfolio Value"]}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                fill="url(#portfolioGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+        <ChartContainer
+          config={chartConfig}
+          className="aspect-auto h-[250px] w-full"
+        >
+          <AreaChart data={filteredData}>
+            <defs>
+              <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-value)"
+                  stopOpacity={0.8}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-value)"
+                  stopOpacity={0.1}
+                />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              minTickGap={32}
+              tickFormatter={(value) => {
+                const date = new Date(value)
+                return date.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
+              }}
+            />
+            <YAxis
+              domain={["dataMin - 500", "dataMax + 500"]}
+              hide={true}
+            />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(value) => {
+                    return new Date(value).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric"
+                    })
+                  }}
+                  formatter={(value) => `$${Number(value).toLocaleString()}`}
+                  indicator="dot"
+                />
+              }
+            />
+            <Area
+              dataKey="value"
+              type="natural"
+              fill="url(#fillValue)"
+              stroke="var(--color-value)"
+              // The stackId="a" property has been removed from here
+            />
+          </AreaChart>
+        </ChartContainer>
       </CardContent>
     </Card>
   )

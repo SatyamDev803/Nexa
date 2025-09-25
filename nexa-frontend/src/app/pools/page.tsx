@@ -1,173 +1,157 @@
 "use client"
-import { useState } from "react"
-import { PoolFilters } from "@/components/pool-filters"
-import { PoolCard } from "@/components/pool-card"
-import { DepositModal } from "@/components/deposit-modal"
-import { AIAssistantButton } from "@/components/ai-assistant-button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { TrendingUp, DollarSign, Target } from "lucide-react"
+
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Header } from "@/components/Header"
-
-const pools = [
-  {
-    id: "1",
-    name: "Basis Traded LBTC",
-    tokens: ["LBTC"],
-    apy: "27.9%",
-    tvl: "$2.79m",
-    risk: "Medium" as const,
-    strategy: "Bullish BTC",
-    description: "Leveraged Bitcoin trading strategy with automated rebalancing and risk management.",
-    minDeposit: "0.1 BTC",
-    lockPeriod: "30 days",
-  },
-  {
-    id: "2",
-    name: "Basis Traded weETH",
-    tokens: ["weETH"],
-    apy: "21.65%",
-    tvl: "$1.65m",
-    risk: "Medium" as const,
-    strategy: "Bullish BTC",
-    description: "Ethereum-based yield strategy with liquid staking rewards and trading premiums.",
-    minDeposit: "0.5 ETH",
-  },
-  {
-    id: "3",
-    name: "rsweETH Harvest",
-    tokens: ["rsweETH"],
-    apy: "17.92%",
-    tvl: "$7.92m",
-    risk: "Low" as const,
-    strategy: "Trending ETH",
-    description: "Restaked Ethereum harvesting strategy with compound rewards and low volatility.",
-    minDeposit: "0.1 ETH",
-  },
-  {
-    id: "4",
-    name: "sUSDe Bull",
-    tokens: ["sUSDe"],
-    apy: "31.97%",
-    tvl: "$1.97m",
-    risk: "Medium" as const,
-    strategy: "Bullish BTC",
-    description: "Synthetic USD strategy with delta-neutral positioning and high yield generation.",
-    minDeposit: "$100",
-  },
-  {
-    id: "5",
-    name: "XRP Yield",
-    tokens: ["XRP"],
-    apy: "10.98%",
-    tvl: "$0.98m",
-    risk: "High" as const,
-    strategy: "Limited Downside",
-    description: "XRP-based yield farming with cross-chain opportunities and risk mitigation.",
-    minDeposit: "100 XRP",
-    lockPeriod: "14 days",
-  },
-  {
-    id: "6",
-    name: "VeChain Staking",
-    tokens: ["VET"],
-    apy: "14.53%",
-    tvl: "$1.53m",
-    risk: "Medium" as const,
-    strategy: "Trending ETH",
-    description: "VeChain ecosystem staking with governance rewards and network participation.",
-    minDeposit: "1000 VET",
-  },
-  {
-    id: "7",
-    name: "Stacks DeFi",
-    tokens: ["STX"],
-    apy: "23.10%",
-    tvl: "$3.10m",
-    risk: "Medium" as const,
-    strategy: "Bullish BTC",
-    description: "Bitcoin-secured smart contracts with Stacks protocol yield opportunities.",
-    minDeposit: "50 STX",
-  },
-  {
-    id: "8",
-    name: "Stable Yield Pool",
-    tokens: ["USDC", "USDT", "DAI"],
-    apy: "12.4%",
-    tvl: "$15.2m",
-    risk: "Low" as const,
-    strategy: "Stable Yield",
-    description: "Multi-stablecoin pool with automated rebalancing and consistent returns.",
-    minDeposit: "$50",
-  },
-]
-
-const globalStats = [
-  {
-    title: "Total Value Locked",
-    value: "$34.74M",
-    change: "+8.2%",
-    icon: DollarSign,
-  },
-  {
-    title: "Active Pools",
-    value: "24",
-    change: "+3 new",
-    icon: Target,
-  },
-  {
-    title: "Avg. APY",
-    value: "19.8%",
-    change: "+2.1%",
-    icon: TrendingUp,
-  },
-]
+import { PoolFilters } from "@/components/pool-filters"
+import { YieldResultsTable } from "@/components/YieldResultsTable"
+import { WinnerPoolCard } from "@/components/WinnerPoolCard"
+import { DepositModal, type DepositStatus } from "@/components/deposit-modal"
+import { getRankedPools, createIntent, submitTransaction, getTransactionStatus } from "@/lib/api"
+import { type RankResponse, type RankedPool, type IntentWithQuote } from "@/types"
+import { useWallet } from "@/components/providers/AppProviders"
+import { toast } from "sonner"
+import { utils } from "near-api-js"
+import { Separator } from "@/components/ui/separator"
+import { Loader2 } from "lucide-react"
 
 export default function PoolsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedRisk, setSelectedRisk] = useState("All")
-  const [selectedStrategy, setSelectedStrategy] = useState("All")
-  const [sortBy, setSortBy] = useState("apy-desc")
-  const [selectedPool, setSelectedPool] = useState<(typeof pools)[0] | null>(null)
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
+  const [amount, setAmount] = useState("1000")
+  const [sourceToken, setSourceToken] = useState("NEAR");
+  const [destinationToken, setDestinationToken] = useState("USDC")
+  const [selectedChains, setSelectedChains] = useState<string[]>([])
+  
+  const [poolsResponse, setPoolsResponse] = useState<RankResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const { accountId, selector } = useWallet()
+  const isInitialMount = useRef(true);
 
-  const handleDeposit = (poolId: string) => {
-    const pool = pools.find((p) => p.id === poolId)
-    if (pool) {
-      setSelectedPool(pool)
-      setIsDepositModalOpen(true)
-    }
-  }
+  const [intentWithQuote, setIntentWithQuote] = useState<IntentWithQuote | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [depositStatus, setDepositStatus] = useState<DepositStatus>("PLAN");
+  const [txHash, setTxHash] = useState<string | null>(null);
 
-  const filteredPools = pools
-    .filter((pool) => {
-      const matchesSearch =
-        pool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pool.tokens.some((token) => token.toLowerCase().includes(searchQuery.toLowerCase()))
-      const matchesRisk = selectedRisk === "All" || pool.risk === selectedRisk
-      const matchesStrategy = selectedStrategy === "All" || pool.strategy === selectedStrategy
-      return matchesSearch && matchesRisk && matchesStrategy
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "apy-desc":
-          return Number.parseFloat(b.apy) - Number.parseFloat(a.apy)
-        case "apy-asc":
-          return Number.parseFloat(a.apy) - Number.parseFloat(b.apy)
-        case "tvl-desc":
-          return Number.parseFloat(b.tvl.replace(/[$m]/g, "")) - Number.parseFloat(a.tvl.replace(/[$m]/g, ""))
-        case "tvl-asc":
-          return Number.parseFloat(a.tvl.replace(/[$m]/g, "")) - Number.parseFloat(b.tvl.replace(/[$m]/g, ""))
-        default:
-          return 0
+  const handleSearch = useCallback(async () => {
+    setIsLoading(true)
+    setPoolsResponse(null)
+    try {
+      const response = await getRankedPools({ 
+        amount: Number(amount),
+        token: destinationToken,
+        chains: selectedChains,
+      })
+      setPoolsResponse(response)
+      if (response.top.length === 0) {
+        toast.info("No pools found for the selected filters.")
       }
-    })
+    } catch (error) {
+      console.error("Failed to fetch pools:", error)
+      toast.error("Failed to fetch pools. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [amount, destinationToken, selectedChains]);
+
+  useEffect(() => {
+    handleSearch();
+  }, [handleSearch]);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    handleSearch();
+  }, [handleSearch]);
+
+  const handleDeposit = async (pool: RankedPool) => {
+    if (!accountId) {
+      toast.error("Please connect your wallet to deposit.");
+      return;
+    }
+    setIntentWithQuote(null);
+    setTxHash(null);
+    setDepositStatus("PLAN");
+    setIsModalOpen(true);
+    
+    try {
+      const intentResponse = await createIntent({
+        user: accountId,
+        amount: amount,
+        fromToken: sourceToken,
+        fromChain: "near",
+        winner: pool,
+      });
+      setIntentWithQuote(intentResponse);
+    } catch {
+      toast.error("Failed to create deposit plan.");
+      setIsModalOpen(false);
+    }
+  };
+
+  const executeTransaction = async () => {
+    if (!selector || !accountId || !intentWithQuote) return;
+    
+    setDepositStatus("SENDING");
+    try {
+      const wallet = await selector.wallet();
+      const amountInYocto = utils.format.parseNearAmount(intentWithQuote.quote.inputAmount);
+      
+      const result = await wallet.signAndSendTransaction({
+        signerId: accountId,
+        receiverId: intentWithQuote.quote.depositAddress,
+        actions: [{
+          type: "Transfer",
+          params: { deposit: amountInYocto! }
+        }]
+      });
+
+      if (!result) {
+        throw new Error("Transaction failed or was cancelled.");
+      }
+
+      const hash = typeof result === 'string' ? result : result.transaction.hash;
+      setTxHash(hash);
+      setDepositStatus("SUBMITTED");
+      await submitTransaction({ intent: intentWithQuote, txHash: hash });
+      pollStatus();
+
+    } catch (error) {
+      console.error("Transaction Error:", error);
+      const errorMessage = (error as Error).message;
+      if (!errorMessage.includes("User rejected")) {
+        toast.error("Transaction failed.");
+      }
+      setDepositStatus("PLAN");
+    }
+  };
+
+  const pollStatus = useCallback(() => {
+    setDepositStatus("POLLING");
+    const intervalId = setInterval(async () => {
+      try {
+        if (!intentWithQuote) {
+          clearInterval(intervalId);
+          return;
+        }
+        const res = await getTransactionStatus(intentWithQuote.quote.depositAddress);
+        if (res.status === "SUCCESS" || res.status === "REFUNDED") {
+          clearInterval(intervalId);
+          setDepositStatus(res.status === "SUCCESS" ? "SUCCESS" : "ERROR");
+          toast.success("Deposit completed successfully!");
+        }
+      } catch (_error) {
+        console.error("Polling failed:", _error);
+        clearInterval(intervalId);
+        setDepositStatus("ERROR");
+      }
+    }, 5000);
+  }, [intentWithQuote]);
+  
+  const closeModal = () => setIsModalOpen(false);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navigation /> */}
       <Header />
-
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Yield Pools</h1>
@@ -176,73 +160,75 @@ export default function PoolsPage() {
           </p>
         </div>
 
-        {/* Global Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {globalStats.map((stat) => {
-            const Icon = stat.icon
-            return (
-              <Card key={stat.title}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-green-500">{stat.change}</p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Filters */}
-        <PoolFilters
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          selectedRisk={selectedRisk}
-          setSelectedRisk={setSelectedRisk}
-          selectedStrategy={selectedStrategy}
-          setSelectedStrategy={setSelectedStrategy}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
+        <PoolFilters 
+          amount={amount}
+          setAmount={setAmount}
+          sourceToken={sourceToken}
+          setSourceToken={setSourceToken}
+          destinationToken={destinationToken}
+          setDestinationToken={setDestinationToken}
+          selectedChains={selectedChains}
+          setSelectedChains={setSelectedChains}
+          onSearch={handleSearch}
+          isLoading={isLoading}
         />
-
-        {/* Results Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold">
-              {filteredPools.length} Pool{filteredPools.length !== 1 ? "s" : ""}
-            </span>
-            {(selectedRisk !== "All" || selectedStrategy !== "All" || searchQuery) && (
-              <Badge variant="secondary">Filtered</Badge>
-            )}
+        
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center text-center p-12">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Fetching the best pools for you...</p>
           </div>
-        </div>
+        )}
 
-        {/* Pool Grid */}
-        {filteredPools.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPools.map((pool) => (
-              <PoolCard key={pool.id} pool={pool} onDeposit={handleDeposit} />
-            ))}
-          </div>
-        ) : (
-          <Card className="p-12 text-center">
-            <CardContent>
-              <div className="text-muted-foreground">
-                <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">No pools found</h3>
-                <p>Try adjusting your filters or search terms to find more pools.</p>
+        {poolsResponse && !isLoading && (
+          <div className="space-y-8 mt-8">
+            {poolsResponse.winnerOverall && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Overall Best Pool</h2>
+                <div className="max-w-md">
+                  <WinnerPoolCard 
+                    title="Top Pick"
+                    pool={poolsResponse.winnerOverall}
+                    onDeposit={handleDeposit}
+                    isOverallWinner={true}
+                  />
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            )}
+
+            {poolsResponse.winnersByChain.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Best by Chain</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {poolsResponse.winnersByChain.map(({ chain, pool }) => (
+                    <WinnerPoolCard 
+                      key={chain}
+                      title={`Best on ${chain}`}
+                      pool={pool}
+                      onDeposit={handleDeposit}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <Separator />
+
+            <div>
+              <h2 className="text-2xl font-bold mb-4">All Pools</h2>
+              <YieldResultsTable data={poolsResponse.top} onDeposit={handleDeposit} />
+            </div>
+          </div>
         )}
       </main>
-
-      <AIAssistantButton />
-
-      {/* Deposit Modal */}
-      <DepositModal pool={selectedPool} isOpen={isDepositModalOpen} onClose={() => setIsDepositModalOpen(false)} />
+      <DepositModal 
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        intentWithQuote={intentWithQuote}
+        onConfirm={executeTransaction}
+        status={depositStatus}
+        txHash={txHash}
+      />
     </div>
-  )
+  );
 }

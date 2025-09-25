@@ -1,0 +1,100 @@
+{
+  "info": {
+    "name": "Nexa 1Click Backend",
+    "_postman_id": "d3b9e91a-54b6-482b-a12a-1b5eaf42a123",
+    "description": "Collection to test DefiLlama + 1Click API integrated backend (Rank → Intent → Status → Submit).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:4000/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Rank Pools",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:4000/rank?amount=1000&chains=Arbitrum,Base,Solana&token=USDC",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["rank"],
+          "query": [
+            { "key": "amount", "value": "1000" },
+            { "key": "chains", "value": "Arbitrum,Base,Solana" },
+            { "key": "token", "value": "USDC" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Build Intent (real 1Click Quote)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user\": \"youraccount.near\",\n  \"amount\": \"100\",\n  \"fromToken\": \"NEAR\",\n  \"fromChain\": \"near\",\n  \"winner\": {\n    \"id\": \"llama:Base:aave-v3:USDC\",\n    \"platform\": \"aave-v3\",\n    \"chain\": \"Base\",\n    \"token\": \"USDC\",\n    \"tvlUsd\": 123456789,\n    \"apyBasePct\": 3.2,\n    \"apyRewardPct\": 0.5,\n    \"apyNetPct\": 3.7,\n    \"updatedAt\": 1727088000000,\n    \"net7d\": 0.71\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:4000/intent",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["intent"]
+        }
+      }
+    },
+    {
+      "name": "Check Intent Status",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:4000/status?depositAddress=<copy_from_intent_response>",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["status"],
+          "query": [
+            {
+              "key": "depositAddress",
+              "value": "<copy_from_intent_response>"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Submit Intent (ack)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"intent\": {\n    \"user\": \"youraccount.near\",\n    \"amount\": \"100\",\n    \"fromToken\": \"NEAR\",\n    \"fromChain\": \"near\",\n    \"toPool\": { \"chain\": \"Base\", \"platform\": \"aave-v3\", \"token\": \"USDC\" },\n    \"steps\": [\n      { \"type\": \"swap\", \"protocol\": \"Uniswap\", \"tokenIn\": \"NEAR\", \"tokenOut\": \"USDC\" },\n      { \"type\": \"bridge\", \"protocol\": \"bridge:auto\", \"fromChain\": \"near\", \"toChain\": \"Base\", \"tokenIn\": \"USDC\", \"tokenOut\": \"USDC\" },\n      { \"type\": \"deposit\", \"protocol\": \"aave-v3 + OasisROFL\", \"toChain\": \"Base\", \"tokenIn\": \"USDC\", \"tokenOut\": \"USDC\" }\n    ]\n  },\n  \"txHash\": \"near_tx_hash_example\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:4000/submit",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["submit"]
+        }
+      }
+    }
+  ]
+}

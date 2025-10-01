@@ -1,4 +1,4 @@
-# Nexa: AI-Powered Multi-Chain Yield Aggregator
+# Nexa: AI-Powered Multi-Chain Yield Aggregator | [Demo Video](https://youtu.be/0vUTFah5Gs4)
 
 A web application designed to simplify DeFi yield farming across multiple blockchains. Nexa identifies and ranks the best yield opportunities from sources like DefiLlama, constructs a clear, multi-step transaction plan, and uses the NEAR blockchain's intent-based architecture for execution.
 

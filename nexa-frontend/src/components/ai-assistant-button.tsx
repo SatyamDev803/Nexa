@@ -94,7 +94,6 @@ export function AIAssistantButton() {
     setInputMessage("")
     setIsTyping(true)
 
-    // Simulate AI response delay
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
     const response = sampleResponses[message as keyof typeof sampleResponses] || {
@@ -103,13 +102,13 @@ export function AIAssistantButton() {
       suggestions: ["Show me high-yield pools", "Analyze my portfolio", "What's trending now?"],
     }
 
+    // The spread operator (...) copies all properties from `response`
+    // This handles cases where `suggestions` or `poolRecommendation` might not exist.
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       type: "assistant",
-      content: response.content,
       timestamp: new Date(),
-      suggestions: response.suggestions,
-      poolRecommendation: response.poolRecommendation,
+      ...response,
     }
 
     setMessages((prev) => [...prev, assistantMessage])
@@ -122,7 +121,6 @@ export function AIAssistantButton() {
 
   return (
     <>
-      {/* Floating Button */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40 bg-primary hover:bg-primary/90"
@@ -131,7 +129,6 @@ export function AIAssistantButton() {
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </Button>
 
-      {/* Chat Panel */}
       {isOpen && (
         <Card className="fixed bottom-24 right-6 w-96 h-[500px] shadow-xl z-40 flex flex-col">
           <CardHeader className="pb-3 border-b border-border/40">
@@ -145,9 +142,7 @@ export function AIAssistantButton() {
               </Badge>
             </CardTitle>
           </CardHeader>
-
           <CardContent className="flex-1 flex flex-col p-0">
-            {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
@@ -159,8 +154,6 @@ export function AIAssistantButton() {
                     >
                       <p className="text-sm">{message.content}</p>
                     </div>
-
-                    {/* Pool Recommendation */}
                     {message.poolRecommendation && (
                       <Card className="mt-2 mr-2 bg-primary/5 border-primary/20">
                         <CardContent className="p-3">
@@ -183,8 +176,6 @@ export function AIAssistantButton() {
                         </CardContent>
                       </Card>
                     )}
-
-                    {/* Suggestions */}
                     {message.suggestions && (
                       <div className="mt-2 mr-2 space-y-1">
                         {message.suggestions.map((suggestion, index) => (
@@ -200,15 +191,12 @@ export function AIAssistantButton() {
                         ))}
                       </div>
                     )}
-
                     <div className="text-xs text-muted-foreground mt-1 px-1">
                       {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   </div>
                 </div>
               ))}
-
-              {/* Typing Indicator */}
               {isTyping && (
                 <div className="flex justify-start">
                   <div className="bg-muted p-3 rounded-lg mr-2 flex items-center gap-2">
@@ -217,11 +205,8 @@ export function AIAssistantButton() {
                   </div>
                 </div>
               )}
-
               <div ref={messagesEndRef} />
             </div>
-
-            {/* Quick Suggestions */}
             {messages.length === 1 && (
               <>
                 <Separator />
@@ -243,8 +228,6 @@ export function AIAssistantButton() {
                 </div>
               </>
             )}
-
-            {/* Input Area */}
             <div className="border-t border-border/40 p-4">
               <div className="flex gap-2">
                 <Input

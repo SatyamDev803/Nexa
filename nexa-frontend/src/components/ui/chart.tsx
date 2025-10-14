@@ -5,7 +5,6 @@ import * as RechartsPrimitive from 'recharts'
 
 import { cn } from '@/lib/utils'
 
-// Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const
 
 export type ChartConfig = {
@@ -104,6 +103,31 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+// Define a more specific type for the tooltip payload from Recharts
+type TooltipPayloadValue = {
+  name: string
+  dataKey: string
+  value: number | string
+  color: string
+  payload: Record<string, unknown> & { fill: string }
+}
+
+// Define the full props for the custom tooltip content
+interface ChartTooltipContentProps extends React.ComponentProps<'div'> {
+  active?: boolean
+  payload?: TooltipPayloadValue[]
+  label?: string | number
+  labelFormatter?: (label: string | number, payload: TooltipPayloadValue[]) => React.ReactNode
+  formatter?: (value: number | string, name: string, item: TooltipPayloadValue, index: number, payload: TooltipPayloadValue) => React.ReactNode
+  indicator?: 'line' | 'dot' | 'dashed'
+  hideLabel?: boolean
+  hideIndicator?: boolean
+  labelClassName?: string
+  color?: string
+  nameKey?: string
+  labelKey?: string
+}
+
 function ChartTooltipContent({
   active,
   payload,
@@ -118,18 +142,11 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<'div'> & {
-    hideLabel?: boolean
-    hideIndicator?: boolean
-    indicator?: 'line' | 'dot' | 'dashed'
-    nameKey?: string
-    labelKey?: string
-  }) {
+}: ChartTooltipContentProps) {
   const { config } = useChart()
 
   const tooltipLabel = React.useMemo(() => {
-    if (hideLabel || !payload?.length) {
+    if (hideLabel || !payload?.length || label === undefined) {
       return null
     }
 
@@ -144,7 +161,7 @@ function ChartTooltipContent({
     if (labelFormatter) {
       return (
         <div className={cn('font-medium', labelClassName)}>
-          {labelFormatter(value, payload)}
+          {labelFormatter(label, payload)}
         </div>
       )
     }
@@ -193,7 +210,7 @@ function ChartTooltipContent({
               )}
             >
               {formatter && item?.value !== undefined && item.name ? (
-                formatter(item.value, item.name, item, index, item.payload)
+                formatter(item.value, item.name, item, index, item)
               ) : (
                 <>
                   {itemConfig?.icon ? (
@@ -250,17 +267,30 @@ function ChartTooltipContent({
 
 const ChartLegend = RechartsPrimitive.Legend
 
+// Define a specific type for the legend payload items
+type LegendPayloadItem = {
+  value: string;
+  color: string;
+  dataKey?: string;
+  payload?: {
+    fill: string;
+  };
+};
+
+type ChartLegendContentProps = Omit<React.ComponentProps<'div'>, 'payload'> &
+  Pick<RechartsPrimitive.LegendProps, 'verticalAlign'> & {
+    payload?: LegendPayloadItem[];
+    hideIcon?: boolean;
+    nameKey?: string;
+  };
+
 function ChartLegendContent({
   className,
   hideIcon = false,
   payload,
   verticalAlign = 'bottom',
   nameKey,
-}: React.ComponentProps<'div'> &
-  Pick<RechartsPrimitive.LegendProps, 'payload' | 'verticalAlign'> & {
-    hideIcon?: boolean
-    nameKey?: string
-  }) {
+}: ChartLegendContentProps) {
   const { config } = useChart()
 
   if (!payload?.length) {
@@ -304,7 +334,6 @@ function ChartLegendContent({
   )
 }
 
-// Helper to extract item config from a payload.
 function getPayloadConfigFromPayload(
   config: ChartConfig,
   payload: unknown,

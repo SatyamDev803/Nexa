@@ -15,7 +15,7 @@ export default function LandingPage() {
       <section className="py-20 px-4">
         <div className="container mx-auto text-center max-w-4xl">
           <div className="mb-8">
-            <h1 className="text-9xl md:text-6xl font-bold mb-6 text-balance">
+            <h1 className="text-xl md:text-6xl font-bold mb-6 text-balance">
               Grow Your Crypto with <span className="text-primary">Smart Vaults</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 text-pretty max-w-2xl mx-auto">
